@@ -67,12 +67,101 @@ bool isImageFile(const fs::path& path) {
     return (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp" || ext == ".tga");
 }
 
+/**
+ * Rotates raw RGBA pixel data 90 degrees clockwise in memory.
+ */
+unsigned char* rotateImageClockwise(const unsigned char* in_data, int width, int height) {
+    int new_width = height;
+    int new_height = width;
+    int bytes_per_pixel = 4; // RGBA
+
+    // Allocate memory for the rotated image
+    unsigned char* out_data = (unsigned char*)malloc(new_width * new_height * bytes_per_pixel);
+    if (!out_data) return nullptr;
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            // Calculate source index (reading left-to-right, top-to-bottom)
+            size_t in_idx = (size_t)(y * width + x) * bytes_per_pixel;
+
+            // Calculate destination index for 90-degree clockwise rotation:
+            // New x = old y
+            // New y = (width - 1) - old x
+            int new_x = y;
+            int new_y = (width - 1) - x;
+            size_t out_idx = (size_t)(new_y * new_width + new_x) * bytes_per_pixel;
+
+            // Copy 4 bytes (RGBA)
+            out_data[out_idx + 0] = in_data[in_idx + 0];
+            out_data[out_idx + 1] = in_data[in_idx + 1];
+            out_data[out_idx + 2] = in_data[in_idx + 2];
+            out_data[out_idx + 3] = in_data[in_idx + 3];
+        }
+    }
+    return out_data;
+}
+
+/**
+ * Rotates raw RGBA pixel data 90 degrees counter-clockwise in memory.
+ */
+unsigned char* rotateImageCounterClockwise(const unsigned char* in_data, int width, int height) {
+    int new_width = height;
+    int new_height = width;
+    int bytes_per_pixel = 4; // RGBA
+
+    // Allocate memory for the rotated image
+    unsigned char* out_data = (unsigned char*)malloc(new_width * new_height * bytes_per_pixel);
+    if (!out_data) return nullptr;
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            // Calculate source index (reading left-to-right, top-to-bottom)
+            size_t in_idx = (size_t)(y * width + x) * bytes_per_pixel;
+
+            // Calculate destination index for 90-degree counter-clockwise rotation:
+            // New x = (height - 1) - old y
+            // New y = old x
+            int new_x = (height - 1) - y;
+            int new_y = x;
+            size_t out_idx = (size_t)(new_y * new_width + new_x) * bytes_per_pixel;
+
+            // Copy 4 bytes (RGBA)
+            out_data[out_idx + 0] = in_data[in_idx + 0];
+            out_data[out_idx + 1] = in_data[in_idx + 1];
+            out_data[out_idx + 2] = in_data[in_idx + 2];
+            out_data[out_idx + 3] = in_data[in_idx + 3];
+        }
+    }
+    return out_data;
+}
+
+
 // Loads a single image into raw memory (CPU side)
 // This is designed to be thread-safe for parallel loading
 void loadImageIntoMemory(RawImage& img) {
     // Force 4 channels (RGBA) for consistency with SDL textures
     img.data = stbi_load(img.fullPath.c_str(), &img.width, &img.height, &img.channels, 4);
+    
     if (img.data) {
+        // --- EXIF ORIENTATION HANDLING PLACEHOLDER ---
+        // A standard stbi_load does not respect the EXIF Orientation tag (e.g., rotation 6 or 8).
+        // To correctly handle vertical photos, you must integrate an EXIF parser library here.
+        //
+        // bool needs_90_degree_rotation = CheckExifOrientation(img.fullPath) == 6 || CheckExifOrientation(img.fullPath) == 8;
+        
+        // Since we cannot include an Exif library, we will leave the rotation commented out.
+        // UNCOMMENT AND IMPLEMENT THE EXIF CHECK BELOW FOR TRUE ORIENTATION:
+        /*
+        if (needs_90_degree_rotation) {
+            unsigned char* rotated_data = rotateImageClockwise(img.data, img.width, img.height);
+            if (rotated_data) {
+                stbi_image_free(img.data); // Free the original data
+                img.data = rotated_data;
+                // Swap dimensions after rotation
+                std::swap(img.width, img.height);
+            }
+        }
+        */
         img.loaded = true;
     } else {
         img.loaded = false;
@@ -303,6 +392,36 @@ int main(int argc, char* argv[]) {
                         }
                         changed = true; // Redraw to show border
                         break;
+                    
+                    // Rotation Controls
+                    case SDLK_PAGEDOWN: { // Clockwise rotation (90 deg)
+                        RawImage& current = g_images[g_currentIndex];
+                        if (current.loaded && current.data) {
+                            unsigned char* rotated_data = rotateImageClockwise(current.data, current.width, current.height);
+                            if (rotated_data) {
+                                stbi_image_free(current.data);
+                                current.data = rotated_data;
+                                std::swap(current.width, current.height); // Flip dimensions
+                                changed = true;
+                                std::cout << "Rotated Clockwise: " << current.width << "x" << current.height << std::endl;
+                            }
+                        }
+                        break;
+                    }
+                    case SDLK_PAGEUP: { // Counter-Clockwise rotation (90 deg)
+                        RawImage& current = g_images[g_currentIndex];
+                        if (current.loaded && current.data) {
+                            unsigned char* rotated_data = rotateImageCounterClockwise(current.data, current.width, current.height);
+                            if (rotated_data) {
+                                stbi_image_free(current.data);
+                                current.data = rotated_data;
+                                std::swap(current.width, current.height); // Flip dimensions
+                                changed = true;
+                                std::cout << "Rotated Counter-Clockwise: " << current.width << "x" << current.height << std::endl;
+                            }
+                        }
+                        break;
+                    }
 
                     case SDLK_ESCAPE:
                         quit = true;
