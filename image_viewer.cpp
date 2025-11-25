@@ -92,7 +92,7 @@ void setReviewStatus(RawImage& img, ImageStatus newStatus) {
             // Create symlink
             if (fs::exists(linkPath)) fs::remove(linkPath); // Clear old if exists
             fs::create_symlink(img.fullPath, linkPath);
-            std::cout << "Marked GOOD: " << img.fullPath << " -> Symlink created." << linkPath << std::endl;
+            std::cout << "Marked GOOD: " << img.filename << " -> Symlink created." << std::endl;
         } else {
             // Remove symlink if transitioning to Bad or Neutral
             if (fs::exists(linkPath) || fs::is_symlink(linkPath)) {
@@ -163,6 +163,9 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error: Directory not found -> " << inputPathStr << std::endl;
         return 1;
     }
+
+    // Resolve to absolute path so all stored paths are absolute
+    inputDir = fs::absolute(inputDir);
 
     // Setup "chosen" directory
     g_chosenDir = inputDir / "chosen";
