@@ -167,16 +167,27 @@ int main(int argc, char* argv[]) {
     // Resolve to absolute path so all stored paths are absolute
     inputDir = fs::absolute(inputDir);
 
-    // Setup "chosen" directory
-    g_chosenDir = inputDir / "chosen";
+    // Setup output directory: {cwd}/{folder_name}_chosen
+    std::string dirName = inputDir.filename().string();
+    if (dirName.empty()) {
+        dirName = inputDir.parent_path().filename().string();
+    }
+    if (dirName.empty()) {
+        dirName = "output";
+    }
+
+    g_chosenDir = fs::current_path() / (dirName + "_chosen");
+
     if (!fs::exists(g_chosenDir)) {
         try {
             fs::create_directory(g_chosenDir);
             std::cout << "Created output directory: " << g_chosenDir << std::endl;
         } catch (const std::exception& e) {
-            std::cerr << "Error creating 'chosen' directory: " << e.what() << std::endl;
+            std::cerr << "Error creating output directory: " << e.what() << std::endl;
             return 1;
         }
+    } else {
+        std::cout << "Using output directory: " << g_chosenDir << std::endl;
     }
 
     // 2. Scan Directory
